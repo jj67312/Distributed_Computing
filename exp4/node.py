@@ -12,6 +12,7 @@ NETWORK = {
 }
 CRS = ("127.0.0.1", 4000)
 
+
 class RPCServer:
     def __init__(self, pid, pid_node_mapping, CRS, exetute_after=None):
         # this nodes pid
@@ -51,7 +52,8 @@ class RPCServer:
         timestamp: seconds passed since an epoch
         pid: process id which requested access
         """
-        print(f"[{round(time() * 1000)}] REQUEST --> {remote_node_pid} ({round(timestamp*1000)})")
+        print(
+            f"[{round(time() * 1000)}] REQUEST --> {remote_node_pid} ({round(timestamp*1000)})")
 
         # first check if this node wants to execute critical section
         # if yes then compair timestamps
@@ -92,34 +94,61 @@ class RPCServer:
                 node.request(timestamp, self.pid)
 
         # now wait for all reply's
+        cart = {}
+
         if set(self.pid_node_mapping.keys()) == self.reply_set:
             # now we are allowed to execute in critical section
-            self.CRS.execute_task_in_critical(self.pid)
-            self.task_done = True
-            print(f"[{round(time()*1000)}] Critical Section Resource Released\n\n")
 
-            # after this process has completed execution
-            # reply to everyone in queue
-            for rpid in self.request_queue:
-                self.pid_node_mapping[rpid].reply(self.pid)
+            prices = self.CRS.load_data()
+            items = {}
+
+            for i, key in enumerate(prices):
+                items[i + 1] = key
+            print("Select medicine")
+            while(True):
+              for i, (k, v) in enumerate(prices.items()):
+                print(i + 1, k + ": ", v)
+              print(i + 2, "Generate bill")
+              print("Enter your choices:")
+              choice = int(input())
+              if choice == i + 2:
+                break
+              print("Enter the quantity")
+              quantity = int(input())
+              cart[items[choice]] = quantity
+
+            print("Your order is confirmed!")
+
+        self.CRS.execute_task_in_critical(self.pid, cart)
+        self.task_done = True
+        print(f"[{round(time()*1000)}] Critical Section Resource Released\n\n")
+
+        # after this process has completed execution
+        # reply to everyone in queue
+        for rpid in self.request_queue:
+            self.pid_node_mapping[rpid].reply(self.pid)
 
         # clear reply_set after execution
         self.reply_set = set()
 
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("pid", type=str, help="Enter pid (node_1, node_2, node_3)")
+    parser.add_argument(
+        "pid", type=str, help="Enter pid (node_1, node_2, node_3)")
     # --time_offset
-    parser.add_argument("--time_offset", type=int, default=None, help="time in seconds after which task starts to execute")
+    parser.add_argument("--time_offset", type=int, default=None,
+                        help="time in seconds after which task starts to execute")
 
     args = parser.parse_args()
 
     PID = args.pid
-    #print(PID)
+    # print(PID)
     TIME_OFFSET = args.time_offset
     # create a RPC server running on a node
-    server = SimpleXMLRPCServer(NETWORK[PID], allow_none=True, logRequests=False)
+    server = SimpleXMLRPCServer(
+        NETWORK[PID], allow_none=True, logRequests=False)
 
     # get all server proxy's
     pid_mapping = dict()
@@ -130,7 +159,8 @@ if __name__ == "__main__":
         pid_mapping[pid] = ServerProxy(f"http://{addr[0]}:{addr[1]}")
 
     crs_proxy = ServerProxy(f"http://{CRS[0]}:{CRS[1]}")
-    server.register_instance(RPCServer(PID, pid_mapping, crs_proxy, TIME_OFFSET))
+    server.register_instance(
+        RPCServer(PID, pid_mapping, crs_proxy, TIME_OFFSET))
 
     try:
         print("Starting RPC Server...")
